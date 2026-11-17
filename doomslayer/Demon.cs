@@ -22,6 +22,8 @@ namespace doomslayer
 
     public class Demon
     {
+        int _speed;
+        public int Speed { get => _speed; }
         Position _position;
         public Position Position { get => _position; set => _position = value; }
         ConsoleSprite _sprite;
@@ -95,8 +97,7 @@ namespace doomslayer
             _health = hp;
             _sightrange = viewDistance;
             _attackrange = damageDistance;
-            //damage = damage;
-            //speed = speed;
+            _speed = speed;
         }
 
         public void TakeDamage(int damage)

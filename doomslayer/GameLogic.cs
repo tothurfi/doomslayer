@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ namespace doomslayer
 {
     internal class GameLogic
     {
+        Random r = new();
         Game game;
         public GameLogic(Game game)
         {
@@ -43,37 +45,38 @@ namespace doomslayer
             }
         }
 
-        private void DemonMoveLogic(Demon demon)
+        private void DemonMoveLogic(Demon demon, long elapsedMilliseconds)
         {
             Random RNG = new();
             int x = demon.Position.X + RNG.Next(-1, 2);
             int y = demon.Position.Y + RNG.Next(-1, 2);
             Position targetPosition = new Position(x, y);
-            Move(demon, targetPosition);
+            Move(demon, targetPosition, elapsedMilliseconds);
         }
 
-        private void UpdateDemons()
+        private void UpdateDemons(long elapsedMilliseconds)
         {
             foreach (Demon demon in game.Demons)
             {
                 demon.UpdateState(game.Player);
                 if (demon.State == DemonStateType.Move)
                 {
-                    DemonMoveLogic(demon);
+                    DemonMoveLogic(demon, elapsedMilliseconds);
                 }
                 else if (demon.State == DemonStateType.Attack)
                 {
-                    DemonAttackLogic(demon);
+                    DemonAttackLogic(demon, elapsedMilliseconds);
                 }
                 DemonIndirectInteractionLogic(demon);
             }
         }
 
-        private void DemonAttackLogic(Demon demon)
+        private void DemonAttackLogic(Demon demon, long elapsedMilliseconds)
         {
             double distance = Position.Distance(demon.Position, game.Player.Position);
             Random r = new();
             int generatedDamage = 0;
+            double multiplier = elapsedMilliseconds / 1000.0;
             switch (demon.Type)
             {
                 case DemonType.Zombieman:
@@ -86,8 +89,9 @@ namespace doomslayer
                     generatedDamage = r.Next(8, 65);
                     break;
             }
-            int damage = (2 * generatedDamage) / (1 + (int)distance);
+            int damage = (int)(2.0 * generatedDamage / (1 + (int)distance) * multiplier);
             game.Player.TakeDamage(damage);
+            game.PlaySoundEffect(SoundEffectType.Pain);
         }
 
         private List<GameItem> GetGameItemsWithinDistance(Position p, double distance)
@@ -137,11 +141,35 @@ namespace doomslayer
                 player.Position = vel;
         }
 
-        public void Move(Demon demon, Position vel)
+        public void Move(Demon demon, Position vel, long elapsedMiliseconds)
         {
+            double moveProbability = (demon.Speed / 100.0) * (elapsedMiliseconds / 1000.0);
+            if (r.NextDouble() >= moveProbability)
+                return;
+
             double sum = GetTotalFillingratio(vel) + demon.FillingRatio;
             if (sum <= 1.0)
                 demon.Position = vel;
+        }
+
+        public void PlayerBFGAttackLogic(Player player)
+        {
+            if (player.BFGCells <= 0)
+                return;
+
+            player.ShootBFG();
+            game.PlaySoundEffect(SoundEffectType.BFG);
+            List<Demon> demons = GetDemonsWithinDistance(player.Position, player.SightRange);
+            Random r = new();
+            foreach (Demon demon in demons)
+            {
+                double distance = Position.Distance(player.Position, demon.Position);
+                int damage = r.Next(100,801);
+                demon.TakeDamage(damage);
+
+                if(!demon.Alive)
+                    player.AddCombatPoints(1);
+            }
         }
 
         public void PlayerAttackLogic(Player player)
@@ -150,6 +178,7 @@ namespace doomslayer
                 return;
 
             player.Shoot();
+            game.PlaySoundEffect(SoundEffectType.Shotgun);
 
             List<Demon> demons = GetDemonsWithinDistance(player.Position, player.SightRange);
             Random r = new();
@@ -178,9 +207,9 @@ namespace doomslayer
             }
         }
 
-        public void UpdateGameState()
+        public void UpdateGameState(long elapsedMilliseconds)
         {
-            UpdateDemons();
+            UpdateDemons(elapsedMilliseconds);
             CleanUpGameItems();
             CleanUpDemons();
         }
@@ -194,6 +223,7 @@ namespace doomslayer
                 {
                     case ItemType.Door:
                         item.Interact();
+                        game.PlaySoundEffect(SoundEffectType.Door);
                         break;
                     case ItemType.LevelExit:
                         item.Interact();
@@ -213,14 +243,22 @@ namespace doomslayer
                     case ItemType.Ammo:
                         item.Interact();
                         game.Player.PickUpAmmo(5);
+                        game.PlaySoundEffect(SoundEffectType.ItemPickup);
                         break;
                     case ItemType.Medikit:
                         item.Interact();
+                        game.PlaySoundEffect(SoundEffectType.ItemPickup);
                         game.Player.PickUpHealth(25);
                         break;
                     case ItemType.ToxicWaste:
                         item.Interact();
+                        game.PlaySoundEffect(SoundEffectType.ItemPickup);
                         game.Player.TakeDamage(5);
+                        break;
+                    case ItemType.BFGCell:
+                        item.Interact();
+                        game.PlaySoundEffect(SoundEffectType.ItemPickup);
+                        game.Player.PickUpBFGCell();
                         break;
                 }
             }

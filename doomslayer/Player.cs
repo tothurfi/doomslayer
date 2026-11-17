@@ -32,6 +32,16 @@ namespace doomslayer
             }
         }
 
+        int _cells;
+        public int BFGCells { get => _cells;
+            set
+            {
+                if (value >= 0 && value <= MaxBFGCells)
+                    _cells = value;
+            }
+        }
+        public int MaxBFGCells { get => 3; }
+
         int _sightrange;
         public int SightRange { get => _sightrange; }
 
@@ -65,17 +75,27 @@ namespace doomslayer
             _health = 100;
             _sightrange = 8;
             _alive = true;
-            _ammo = 50;
+            _ammo = 10;
         }
 
         public void Shoot()
         {
-            _ammo--;
+            Ammo--;
         }
 
-        public void PickUpAmmo(int ammo)
+        public void PickUpAmmo(int amount)
         {
-            Ammo += ammo;
+            Ammo += amount;
+        }
+
+        public void PickUpBFGCell()
+        {
+            BFGCells++;
+        }
+
+        public void ShootBFG()
+        {
+            BFGCells--;
         }
 
         public void PickUpHealth(int hp)
@@ -90,9 +110,11 @@ namespace doomslayer
 
         public void TakeDamage(int damage)
         {
-            _health -= damage;
+            Health -= damage;
             if (Health <= 0)
+            {
                 _alive = false;
+            }
         }
     }
 }
